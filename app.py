@@ -1,53 +1,43 @@
-"""
-Streamlit live demo. Run with: streamlit run app.py
-This is the thing you show judges. Sliders let them "poke" the system live
-(more clouds, add a festival, shrink supply) and watch forecast + allocation
-respond in real time -- that's the wow-factor moment.
-"""
+#Streamlit live demo. Run with: streamlit run app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
+import json
 
-from data.generate_synthetic_data import (
-    ZONES, ZONE_TX_CAPACITY_MW, ZONE_BASE_LOAD_MW,
-    ZONE_SOLAR_CAPACITY_MW, solar_multiplier,
-)
-from src.forecast.model import DemandForecaster
+grid_df = pd.read_csv("data/custom_grid_dataset.csv", parse_dates=["timestamp"])
+with open("data/custom_grid_dataset_config.json") as f:
+    config = json.load(f)
+ZONES = config["zones"]
 from src.optimize.market_allocator import allocate_market, DEFAULT_PRIORITY, DEFAULT_SOURCES
 
-# approx lat/lon for demo map (not survey-grade, good enough for visualization)
 ZONE_COORDS = {
-    "Rohini": (28.7360, 77.1200),
-    "Dwarka": (28.5921, 77.0460),
-    "Connaught_Place": (28.6315, 77.2167),
-    "Karol_Bagh": (28.6519, 77.1909),
-    "Saket": (28.5245, 77.2066),
-    "Shahdara": (28.6692, 77.2900),
+    "North": (28.71, 77.19),
+    "South": (28.53, 77.21),
+    "East": (28.65, 77.30),
+    "West": (28.62, 77.05),
+    "Central": (28.63, 77.22),
 }
 
 st.set_page_config(page_title="Delhi Grid AI", layout="wide")
-st.title("⚡ AI-Based Electricity Demand & Peak-Allocation — Live Demo")
+st.title("NEXGRID - AI-Based Electricity Demand & Peak-Allocation")
 st.caption("Forecast (quantile regression) → Optimize (LP allocation) → Adapt (live sliders)")
 
-
-@st.cache_resource
-def load_model():
-    fc = DemandForecaster()
-    fc.load("src/forecast/forecaster.joblib")
-    return fc
-
-
-forecaster = load_model()
-
-# ---------------- Sidebar controls (the "judge can poke it" panel) ----------------
+# ---------------- Sidebar controls ----------------
 st.sidebar.header("Scenario Controls")
 hour = st.sidebar.slider("Hour of day", 0, 23, 20)
 is_festival = st.sidebar.checkbox("Festival day (soft priority boost)", value=False)
 temp_c = st.sidebar.slider("Temperature (°C)", 20, 46, 38)
 cloud_cover = st.sidebar.slider("Cloud cover (affects solar)", 0.0, 1.0, 0.2)
+supply_pct = st.sidebar.slider(
+    available_ts = sorted(grid_df["timestamp"].unique())
+selected_ts = st.sidebar.select_slider(
+    "Pick a real hour from the dataset", options=available_ts,
+    value=available_ts[1000],
+    format_func=lambda t: pd.Timestamp(t).strftime("%Y-%m-%d %H:%M"),
+)
 supply_pct = st.sidebar.slider(
     "Available city supply (% of total forecasted demand)", 50, 120, 90,
     help="Drag below 100% to simulate a supply crunch / heatwave scarcity event."
@@ -68,31 +58,25 @@ green_priority = st.sidebar.slider(
 )
 
 # ---------------- Build input frame & forecast ----------------
-rows = [{
-    "timestamp": datetime(2025, 10, 20 if is_festival else 15, hour, 0, 0),
-    "zone": z, "hour": hour, "is_festival": int(is_festival),
-    "temp_c": temp_c, "cloud_cover": cloud_cover,
-} for z in ZONES]
-input_df = pd.DataFrame(rows)
-preds = forecaster.predict(input_df)
+row = grid_df[grid_df["timestamp"] == selected_ts].set_index("zone")
 
-demand_by_zone = dict(zip(preds["zone"], preds[scenario_key]))
-uncertainty_by_zone = dict(zip(preds["zone"], preds["p90"] - preds["p50"]))
+quantile_col = {"p10": "p10_demand_MW", "p50": "p50_demand_MW", "p90": "p90_demand_MW"}[scenario_key]
+demand_by_zone = row[quantile_col].to_dict()
+uncertainty_by_zone = (row["p90_demand_MW"] - row["p50_demand_MW"]).to_dict()
 total_forecast = sum(demand_by_zone.values())
 total_grid_mw = total_forecast * (supply_pct / 100)
 
-# solar generation per zone, same physics as the data generator
-solar_gen_by_zone = {
-    z: ZONE_SOLAR_CAPACITY_MW[z] * solar_multiplier(hour) * (1 - 0.7 * cloud_cover)
-    for z in ZONES
-}
+solar_gen_by_zone = row["solar_generation_MW"].to_dict()
+tx_capacity = row["maximum_supply_MW"].to_dict()
+priority = row["priority"].to_dict()
+is_festival = bool((row["scenario"] == "FESTIVAL_SURGE").iloc[0])
 
 result = allocate_market(
     demand_by_zone=demand_by_zone,
     solar_gen_by_zone=solar_gen_by_zone,
-    tx_capacity=ZONE_TX_CAPACITY_MW,
+        tx_capacity=tx_capacity,
     total_grid_mw=total_grid_mw,
-    priority=DEFAULT_PRIORITY,
+    priority=priority,
     uncertainty_by_zone=uncertainty_by_zone,
     is_festival=is_festival,
     green_priority=green_priority,
@@ -197,12 +181,10 @@ st.divider()
 
 # ---------------- Forecast uncertainty bands ----------------
 st.subheader("Demand forecast with uncertainty (P10 / P50 / P90)")
-hours_df = pd.DataFrame([
-    {"timestamp": datetime(2025, 10, 15, h, 0, 0), "zone": z, "hour": h,
-     "is_festival": int(is_festival), "temp_c": temp_c, "cloud_cover": cloud_cover}
-    for h in range(24) for z in ZONES
-])
-day_preds = forecaster.predict(hours_df)
+selected_date = pd.Timestamp(selected_ts).normalize()
+day_preds = grid_df[grid_df["timestamp"].dt.normalize() == selected_date].rename(
+    columns={"p10_demand_MW": "p10", "p50_demand_MW": "p50", "p90_demand_MW": "p90"}
+)
 selected_zone = st.selectbox("Zone", ZONES, index=2)
 zone_day = day_preds[day_preds["zone"] == selected_zone].sort_values("hour")
 
@@ -214,7 +196,7 @@ fig.add_trace(go.Scatter(x=zone_day["hour"], y=zone_day["p10"], fill="tonexty",
                           name="P10–P90 band"))
 fig.add_trace(go.Scatter(x=zone_day["hour"], y=zone_day["p50"], line=dict(color="royalblue", width=3),
                           name="P50 (expected)"))
-fig.add_vline(x=hour, line_dash="dash", line_color="red", annotation_text="selected hour")
+fig.add_vline(x=pd.Timestamp(selected_ts).hour, line_dash="dash", line_color="red", annotation_text="selected hour")
 fig.update_layout(height=350, xaxis_title="Hour", yaxis_title="Demand (MW)")
 st.plotly_chart(fig, use_container_width=True)
 
@@ -225,10 +207,11 @@ st.subheader("Allocation detail & explainability")
 st.dataframe(map_df, use_container_width=True, hide_index=True)
 
 if is_festival:
+    boosted = ", ".join(config["festival_boost_zones"])
     st.info(
-        "🪔 Festival mode active: Connaught_Place and Karol_Bagh get a soft priority "
-        "boost baked into their bid (markets/temples), so they're allocated closer to "
-        "full demand and outbid other zones even under scarcity."
+        f"🪔 Festival mode active: {boosted} get a soft priority boost baked into "
+        "their bid (markets/temples), so they're allocated closer to full demand "
+        "and outbid other zones even under scarcity."
     )
 if supply_pct < 100:
     if result["fairness_relaxed"]:
