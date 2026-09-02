@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.pyc
+data/delhi_synthetic_load.csv
+src/forecast/forecaster.joblib
+.streamlit/
+data/raw/
+*.png
