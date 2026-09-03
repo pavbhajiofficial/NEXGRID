@@ -44,24 +44,49 @@ DEFAULT_PRIORITY = {
 FESTIVAL_BOOST_ZONES = {"Connaught_Place", "Karol_Bagh"}
 FESTIVAL_BOOST_FACTOR = 1.3
 
+# Infrastructure-aware zone profiles: replaces a flat priority number with a
+# TYPE (residential / market_temple / hospital_hub / mixed) so priority can
+# react to time-of-day and event context, not just a static weight.
+ZONE_PROFILES = {
+    "Rohini": {"type": "residential", "base": 1.0},
+    "Dwarka": {"type": "residential", "base": 1.0},
+    "Connaught_Place": {"type": "market_temple", "base": 1.2},
+    "Karol_Bagh": {"type": "market_temple", "base": 1.1},
+    "Saket": {"type": "hospital_hub", "base": 1.8},  # emergency/hospital load
+    "Shahdara": {"type": "mixed", "base": 1.0},
+}
+
 
 def compute_bids(
     demand_by_zone: dict,
     solar_gen_by_zone: dict,
-    priority: dict = None,
     uncertainty_by_zone: dict = None,   # {zone: (p90 - p50)} in MW, optional
     is_festival: bool = False,
+    hour: int = 12,
+    manual_zone_boost: dict = None,     # {zone: multiplier} from event_predictor / user edits
     solar_discount: float = 0.3,        # how much local solar reduces a zone's bid
     uncertainty_weight: float = 0.5,    # how much forecast uncertainty raises a zone's bid
 ):
-    """bid[z] = priority_weight * (1 + uncertainty_bonus) * (1 - solar_discount_applied)"""
-    priority = priority or DEFAULT_PRIORITY
+    """bid[z] = zone_type_weight(hour, festival) * week_event_boost * (1 + uncertainty_bonus) * (1 - solar_discount_applied)"""
     uncertainty_by_zone = uncertainty_by_zone or {}
+    manual_zone_boost = manual_zone_boost or {}
     bids = {}
     for z, demand in demand_by_zone.items():
-        w = priority.get(z, 1.0)
-        if is_festival and z in FESTIVAL_BOOST_ZONES:
-            w *= FESTIVAL_BOOST_FACTOR
+        profile = ZONE_PROFILES.get(z, {"type": "residential", "base": 1.0})
+        w = profile["base"]
+
+        # Time-based priority: markets/temples boosted during festival evenings only
+        if is_festival and profile["type"] == "market_temple" and 17 <= hour <= 22:
+            w *= 1.5
+
+        # Emergency priority: hospital hubs get an extra boost overnight
+        if profile["type"] == "hospital_hub" and (hour < 6 or hour > 20):
+            w *= 1.2
+
+        # Week-ahead soft-limit boost: predicted from calendars/news, or
+        # user-edited in the sidebar. Independent of the hour-of-day logic
+        # above -- this is a day-level signal, not an hour-level one.
+        w *= manual_zone_boost.get(z, 1.0)
 
         # uncertainty bonus: zones with volatile forecasts bid a bit more to hedge
         unc = uncertainty_by_zone.get(z, 0.0)
@@ -81,9 +106,10 @@ def allocate_market(
     solar_gen_by_zone: dict,
     tx_capacity: dict,
     total_grid_mw: float,          # total non-solar grid supply available this hour
-    priority: dict = None,
     uncertainty_by_zone: dict = None,
     is_festival: bool = False,
+    hour: int = 12,                # drives time-of-day priority (hospitals/temples)
+    manual_zone_boost: dict = None,  # {zone: multiplier} for the selected day this week
     fairness_pct: float = MIN_FAIRNESS_PCT_DEFAULT,
     green_priority: float = 0.0,   # 0 = ignore carbon, higher = prioritize clean sources more
     sources: dict = None,
@@ -101,20 +127,29 @@ def allocate_market(
     intuitive 0-2ish range.
     """
     sources = sources or DEFAULT_SOURCES
-    priority = priority or DEFAULT_PRIORITY
     zones = list(demand_by_zone.keys())
     source_names = list(sources.keys())
 
     bids = compute_bids(
-        demand_by_zone, solar_gen_by_zone, priority,
-        uncertainty_by_zone, is_festival,
+        demand_by_zone, solar_gen_by_zone,
+        uncertainty_by_zone, is_festival, hour, manual_zone_boost,
     )
 
     # local solar self-consumption (capped at demand -- can't "use" more than you need)
     solar_used = {
         z: min(solar_gen_by_zone.get(z, 0.0), demand_by_zone[z]) for z in zones
     }
-    net_grid_demand = {z: demand_by_zone[z] - solar_used[z] for z in zones}
+
+    # HYPERLOCAL SOLAR WASTAGE PREVENTION: any zone generating more solar than it
+    # needs pools that excess back into the shared grid supply instead of wasting
+    # it -- a rooftop-solar-heavy residential zone can effectively export to a
+    # hospital hub across town via this shared pool.
+    excess_solar = sum(
+        max(0.0, solar_gen_by_zone.get(z, 0.0) - demand_by_zone[z]) for z in zones
+    )
+    total_grid_mw = total_grid_mw + excess_solar
+
+    net_grid_demand = {z: max(0.0, demand_by_zone[z] - solar_used[z]) for z in zones}
 
     source_capacity = {
         s: sources[s]["capacity_fraction"] * total_grid_mw for s in source_names

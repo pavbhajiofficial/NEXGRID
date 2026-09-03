@@ -9,3 +9,6 @@ fastapi
 uvicorn
 pydantic
 matplotlib
+fpdf2
+holidays
+requests
