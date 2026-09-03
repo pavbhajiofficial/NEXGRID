@@ -96,43 +96,63 @@ st.markdown(f"""
 <style>
     #MainMenu, header[data-testid="stHeader"], footer {{ visibility: hidden; height: 0; }}
     .block-container {{ padding-top: 1.6rem; padding-bottom: 3rem; max-width: 1300px; }}
-    html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
+    html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; font-size: 16.5px; }}
     .stApp {{ background-color: {COLORS['bg']}; color: {COLORS['text']}; }}
 
     h1, h2, h3 {{ font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.01em; }}
-    h1 {{ font-size: 1.9rem !important; font-weight: 600 !important; color: {COLORS['text']}; }}
+    h1 {{ font-size: 2.05rem !important; font-weight: 600 !important; color: {COLORS['text']}; }}
     h2, h3 {{ color: {COLORS['text']}; }}
 
-    .app-subtitle {{ color: {COLORS['text_dim']}; font-size: 0.95rem; margin-top: -0.6rem; margin-bottom: 1.4rem; }}
+    .app-subtitle {{ color: {COLORS['text_dim']}; font-size: 1.02rem; margin-top: -0.6rem; margin-bottom: 1.4rem; }}
     hr {{ border-color: {COLORS['border']} !important; }}
 
+    /* Sidebar — everything sized up slightly for readability */
     section[data-testid="stSidebar"] {{
         background-color: {COLORS['panel']};
         border-right: 1px solid {COLORS['border']};
+        font-size: 1.06rem;
     }}
     section[data-testid="stSidebar"] .stMarkdown, section[data-testid="stSidebar"] label {{
         color: {COLORS['text']} !important;
     }}
-    section[data-testid="stSidebar"] h3 {{
-        font-family: 'Space Grotesk', sans-serif; font-size: 0.85rem; letter-spacing: 0.06em;
-        text-transform: uppercase; color: {COLORS['text_dim']} !important; margin-top: 1.2rem;
+    section[data-testid="stSidebar"] label p {{ font-size: 1.06rem !important; }}
+    section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p {{
+        font-size: 1.06rem !important;
     }}
+    section[data-testid="stSidebar"] h3 {{
+        font-family: 'Space Grotesk', sans-serif; font-size: 0.95rem; letter-spacing: 0.06em;
+        text-transform: uppercase; color: {COLORS['text_dim']} !important; margin-top: 1.3rem;
+    }}
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p,
+    section[data-testid="stSidebar"] small {{
+        font-size: 0.92rem !important;
+    }}
+    section[data-testid="stSidebar"] [data-baseweb="radio"] label,
+    section[data-testid="stSidebar"] [data-baseweb="checkbox"] label {{
+        font-size: 1.06rem !important;
+    }}
+    section[data-testid="stSidebar"] [data-testid="stTickBarMin"],
+    section[data-testid="stSidebar"] [data-testid="stTickBarMax"],
+    section[data-testid="stSidebar"] [data-testid="stSliderThumbValue"] {{
+        font-size: 0.98rem !important;
+    }}
+    section[data-testid="stSidebar"] .block-container {{ padding-top: 1.2rem; }}
 
     /* KPI cards */
     .kpi-row {{ display: flex; gap: 12px; margin-bottom: 0.6rem; }}
     .kpi-card {{
         flex: 1; background: {COLORS['panel']}; border: 1px solid {COLORS['border']};
-        border-radius: 10px; padding: 14px 16px;
+        border-radius: 10px; padding: 16px 18px;
     }}
-    .kpi-label {{ font-size: 0.78rem; color: {COLORS['text_dim']}; text-transform: uppercase; letter-spacing: 0.04em; }}
-    .kpi-value {{ font-family: 'Space Grotesk', sans-serif; font-size: 1.55rem; font-weight: 600; margin-top: 2px; }}
-    .kpi-delta {{ font-size: 0.82rem; margin-top: 3px; }}
+    .kpi-label {{ font-size: 0.84rem; color: {COLORS['text_dim']}; text-transform: uppercase; letter-spacing: 0.04em; }}
+    .kpi-value {{ font-family: 'Space Grotesk', sans-serif; font-size: 1.65rem; font-weight: 600; margin-top: 2px; }}
+    .kpi-delta {{ font-size: 0.88rem; margin-top: 3px; }}
     .kpi-delta.pos {{ color: {COLORS['green']}; }}
     .kpi-delta.neg {{ color: {COLORS['red']}; }}
 
     /* Status banner */
     .status-banner {{
-        border-radius: 10px; padding: 12px 16px; font-size: 0.95rem; margin-bottom: 1rem;
+        border-radius: 10px; padding: 13px 18px; font-size: 1.02rem; margin-bottom: 1rem;
         border: 1px solid; display: flex; align-items: center; gap: 10px;
     }}
     .status-banner.alert {{ background: rgba(229,83,61,0.10); border-color: rgba(229,83,61,0.4); color: #F0B3A8; }}
@@ -144,7 +164,7 @@ st.markdown(f"""
     .status-dot.info {{ background: {COLORS['amber']}; }}
 
     .section-tag {{
-        display: inline-block; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+        display: inline-block; font-size: 0.76rem; letter-spacing: 0.08em; text-transform: uppercase;
         color: {COLORS['amber']}; border: 1px solid rgba(232,163,61,0.35); border-radius: 100px;
         padding: 2px 10px; margin-bottom: 6px;
     }}
@@ -152,11 +172,12 @@ st.markdown(f"""
     div[data-testid="stDataFrame"] {{ border: 1px solid {COLORS['border']}; border-radius: 8px; }}
     .stButton > button {{
         background: {COLORS['amber']}; color: #171208; border: none; border-radius: 8px;
-        font-weight: 600; padding: 0.5rem 1.1rem;
+        font-weight: 600; padding: 0.55rem 1.15rem; font-size: 1rem;
     }}
     .stButton > button:hover {{ background: #f2b657; color: #171208; }}
     .stDownloadButton > button {{
         background: transparent; color: {COLORS['text']}; border: 1px solid {COLORS['border']}; border-radius: 8px;
+        font-size: 1rem;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -168,13 +189,17 @@ def kpi_card(label, value, delta=None, delta_positive=True):
         cls = "pos" if delta_positive else "neg"
         sign = "+" if delta_positive else ""
         delta_html = f'<div class="kpi-delta {cls}">{sign}{delta}</div>'
-    return f"""
-    <div class="kpi-card">
-        <div class="kpi-label">{label}</div>
-        <div class="kpi-value">{value}</div>
-        {delta_html}
-    </div>
-    """
+    # Single-line, no leading indentation or blank lines: a blank line inside
+    # an st.markdown HTML block closes raw-HTML mode, and Markdown then reads
+    # any indented line that follows as a code block (that was the bug — cards
+    # after the first were rendering as literal text instead of styled HTML).
+    return (
+        f'<div class="kpi-card">'
+        f'<div class="kpi-label">{label}</div>'
+        f'<div class="kpi-value">{value}</div>'
+        f'{delta_html}'
+        f'</div>'
+    )
 
 
 def status_banner(kind, text):
@@ -345,46 +370,18 @@ else:
 
 # ---------------- Top metrics ----------------
 kpi_html = '<div class="kpi-row">'
-
-# 1. Total forecasted demand
+kpi_html += kpi_card("Total forecasted demand", f"{total_forecast:.0f} MW")
 kpi_html += kpi_card(
-    "Total forecasted demand",
-    f"{total_forecast:.0f} MW"
+    "Available grid supply", f"{total_grid_mw:.0f} MW",
+    delta=f"{total_grid_mw - total_forecast:.0f} MW", delta_positive=(total_grid_mw >= total_forecast)
 )
-
-# 2. Available grid supply
-supply_delta = total_grid_mw - total_forecast
-kpi_html += kpi_card(
-    "Available grid supply",
-    f"{total_grid_mw:.0f} MW",
-    delta=f"{supply_delta:+.0f} MW",
-    delta_positive=(supply_delta >= 0)
-)
-
-# 3. Total served
-kpi_html += kpi_card(
-    "Total served (grid + solar)",
-    f"{result['total_served_mw']:.0f} MW"
-)
-
-# 4. Optimizer status
-optimizer_status = result["status"]
-if result["fairness_relaxed"]:
-    optimizer_status += " — relaxed"
-
+kpi_html += kpi_card("Total served (grid + solar)", f"{result['total_served_mw']:.0f} MW")
 kpi_html += kpi_card(
     "Optimizer status",
-    optimizer_status
+    result["status"] + (" — relaxed" if result["fairness_relaxed"] else "")
 )
-
-# 5. CO₂ emissions
-kpi_html += kpi_card(
-    "CO₂ emissions this hour",
-    f"{result['total_emissions_kg'] / 1000:.1f} t"
-)
-
+kpi_html += kpi_card("CO₂ emissions this hour", f"{result['total_emissions_kg']/1000:.1f} t")
 kpi_html += '</div>'
-
 st.markdown(kpi_html, unsafe_allow_html=True)
 
 st.divider()
