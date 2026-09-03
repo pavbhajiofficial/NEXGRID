@@ -1,9 +1,4 @@
-"""
-Streamlit live demo. Run with: streamlit run app.py
-This is the thing you show judges. Sliders let them "poke" the system live
-(more clouds, add a festival, shrink supply) and watch forecast + allocation
-respond in real time -- that's the wow-factor moment.
-"""
+#Streamlit live demo. Run with: streamlit run app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -39,10 +34,11 @@ st.caption("Forecast (quantile regression) → Optimize (LP allocation) → Adap
 @st.cache_resource
 def load_model():
     fc = DemandForecaster()
-    fc.load("src/forecast/forecaster.joblib")
+
+    df = pd.read_csv("data/delhi_synthetic_load.csv")
+    fc.train(df)
+
     return fc
-
-
 forecaster = load_model()
 
 # ---------------- Sidebar controls (the "judge can poke it" panel) ----------------
@@ -203,7 +199,14 @@ with left:
     fig_map.update_layout(
     map_style="open-street-map",
     margin=dict(l=0, r=0, t=0, b=0)
-)
+)@st.cache_resource
+def load_model():
+    fc = DemandForecaster()
+
+    df = pd.read_csv("data/delhi_synthetic_load.csv")
+    fc.train(df)
+
+    return fc
     st.plotly_chart(fig_map, use_container_width=True)
     st.caption("Red = zone is receiving noticeably less than it forecasted needing. Bubble size = demand.")
 

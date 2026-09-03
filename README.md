@@ -1,4 +1,4 @@
-# ⚡ AI-Based Electricity Demand & Peak-Demand Forecasting (Delhi)
+# AI-Based Electricity Demand & Peak-Demand Forecasting (Delhi)
 **WINS-AID AI Hackathon 2026 — Problem 5, Innovator Track**
 
 ## Problem
@@ -121,7 +121,7 @@ pip install -r requirements.txt
 
 python data/generate_synthetic_data.py   # generates data/delhi_synthetic_load.csv
 python src/forecast/model.py             # trains + saves the forecaster
-streamlit run app.py                     # opens the live demo in your browser
+streamlit run app.py                     
 ```
 
 ## Known simplifications (be upfront about these to judges — it reads as maturity,
@@ -136,4 +136,5 @@ not weakness)
 These are explicitly listed as "Phase 2" in our pitch, not hidden.
 
 ## Team
-[names / roles here]
+Bhavyasri Kurapati - 25BCE0298
+Nallapaneni Keerthi Sri - 25BCE0422
