@@ -66,10 +66,21 @@ def compute_bids(
     manual_zone_boost: dict = None,     # {zone: multiplier} from event_predictor / user edits
     solar_discount: float = 0.3,        # how much local solar reduces a zone's bid
     uncertainty_weight: float = 0.5,    # how much forecast uncertainty raises a zone's bid
+    net_grid_demand_by_zone: dict = None,  # {zone: MW still needed from grid after solar}
+    tx_capacity: dict = None,              # {zone: feeder capacity MW}
+    congestion_weight: float = 0.0,        # 0 = ignore local feeder stress (old behavior)
 ):
-    """bid[z] = zone_type_weight(hour, festival) * week_event_boost * (1 + uncertainty_bonus) * (1 - solar_discount_applied)"""
+    """bid[z] = zone_type_weight(hour, festival) * week_event_boost * congestion_bonus
+                * (1 + uncertainty_bonus) * (1 - solar_discount_applied)
+
+    `solar_discount` and `uncertainty_weight` were previously accepted here but
+    silently dropped by allocate_market(), which never passed them through --
+    they're now real, tunable knobs (see allocate_market below).
+    """
     uncertainty_by_zone = uncertainty_by_zone or {}
     manual_zone_boost = manual_zone_boost or {}
+    net_grid_demand_by_zone = net_grid_demand_by_zone or {}
+    tx_capacity = tx_capacity or {}
     bids = {}
     for z, demand in demand_by_zone.items():
         profile = ZONE_PROFILES.get(z, {"type": "residential", "base": 1.0})
@@ -87,6 +98,15 @@ def compute_bids(
         # user-edited in the sidebar. Independent of the hour-of-day logic
         # above -- this is a day-level signal, not an hour-level one.
         w *= manual_zone_boost.get(z, 1.0)
+
+        # Local congestion signal: a zone straining its own feeder toward its
+        # transmission capacity is under real hyperlocal grid stress, distinct
+        # from city-wide scarcity. This nudges its bid up even when total
+        # supply looks fine, so tight feeders aren't invisible to the market.
+        cap = tx_capacity.get(z, 0.0)
+        if congestion_weight > 0 and cap > 0:
+            congestion_ratio = min(1.0, net_grid_demand_by_zone.get(z, 0.0) / cap)
+            w *= (1 + congestion_weight * congestion_ratio)
 
         # uncertainty bonus: zones with volatile forecasts bid a bit more to hedge
         unc = uncertainty_by_zone.get(z, 0.0)
@@ -113,6 +133,9 @@ def allocate_market(
     fairness_pct: float = MIN_FAIRNESS_PCT_DEFAULT,
     green_priority: float = 0.0,   # 0 = ignore carbon, higher = prioritize clean sources more
     sources: dict = None,
+    solar_discount: float = 0.3,       # bid sensitivity to local solar self-sufficiency
+    uncertainty_weight: float = 0.5,   # bid sensitivity to forecast uncertainty
+    congestion_weight: float = 0.0,    # bid sensitivity to local feeder congestion
 ):
     """
     Multi-source, bid-weighted LP allocation.
@@ -130,11 +153,6 @@ def allocate_market(
     zones = list(demand_by_zone.keys())
     source_names = list(sources.keys())
 
-    bids = compute_bids(
-        demand_by_zone, solar_gen_by_zone,
-        uncertainty_by_zone, is_festival, hour, manual_zone_boost,
-    )
-
     # local solar self-consumption (capped at demand -- can't "use" more than you need)
     solar_used = {
         z: min(solar_gen_by_zone.get(z, 0.0), demand_by_zone[z]) for z in zones
@@ -150,6 +168,16 @@ def allocate_market(
     total_grid_mw = total_grid_mw + excess_solar
 
     net_grid_demand = {z: max(0.0, demand_by_zone[z] - solar_used[z]) for z in zones}
+
+    # bids computed after netting against solar, so the congestion signal can
+    # see each zone's actual remaining grid need against its feeder capacity
+    bids = compute_bids(
+        demand_by_zone, solar_gen_by_zone,
+        uncertainty_by_zone, is_festival, hour, manual_zone_boost,
+        solar_discount=solar_discount, uncertainty_weight=uncertainty_weight,
+        net_grid_demand_by_zone=net_grid_demand, tx_capacity=tx_capacity,
+        congestion_weight=congestion_weight,
+    )
 
     source_capacity = {
         s: sources[s]["capacity_fraction"] * total_grid_mw for s in source_names

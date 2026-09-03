@@ -14,7 +14,7 @@ import joblib
 import os
 
 QUANTILES = [0.1, 0.5, 0.9]
-FEATURES = ["hour", "is_festival", "temp_c", "cloud_cover", "zone_enc", "dow"]
+FEATURES = ["hour", "is_festival", "temp_c", "cloud_cover", "zone_enc", "dow", "heat_stress"]
 
 
 class DemandForecaster:
@@ -26,6 +26,12 @@ class DemandForecaster:
         df = df.copy()
         df["timestamp"] = pd.to_datetime(df["timestamp"])
         df["dow"] = df["timestamp"].dt.dayofweek
+        # explicit heat-stress feature (degrees above the AC-load threshold).
+        # The zone x heat-stress interaction is what makes demand genuinely
+        # hyperlocal (dense zones climb faster once past 30C) -- giving the
+        # boosted trees this feature directly makes that interaction much
+        # easier to learn than leaving it to raw temp_c splits alone.
+        df["heat_stress"] = (df["temp_c"] - 30).clip(lower=0)
         if fit_encoder:
             df["zone_enc"] = self.zone_encoder.fit_transform(df["zone"])
         else:
@@ -39,7 +45,7 @@ class DemandForecaster:
         for q in QUANTILES:
             model = GradientBoostingRegressor(
                 loss="quantile", alpha=q,
-                n_estimators=150, max_depth=3, learning_rate=0.08,
+                n_estimators=150, max_depth=4, learning_rate=0.08,
             )
             model.fit(X, y)
             self.models[q] = model

@@ -22,6 +22,40 @@ ZONE_SOLAR_CAPACITY_MW = {  # rooftop solar penetration varies by zone
 # festival dates you can toggle to test "soft priority" logic (temples, markets)
 FESTIVAL_DATES = {"2025-10-20", "2025-11-01"}  # example: Diwali-ish window
 
+# ----------------------------------------------------------------------------
+# Hyperlocal microclimate. Previously every zone got the exact same temp_c /
+# cloud_cover each hour, and the heat-response formula was identical across
+# zones -- so the trained model had literally no way to learn that geography
+# matters. These offsets + sensitivities are applied per zone below, so
+# zone identity and local weather now genuinely interact in the training
+# data (and the model in src/forecast/model.py can learn that interaction,
+# rather than the app faking it after the fact at inference time).
+# ----------------------------------------------------------------------------
+ZONE_TEMP_OFFSET_C = {   # urban heat island in dense zones, cooling in green zones
+    "Connaught_Place": 1.6,
+    "Karol_Bagh": 1.3,
+    "Shahdara": 1.1,
+    "Rohini": 0.2,
+    "Dwarka": -0.6,
+    "Saket": -0.9,
+}
+ZONE_CLOUD_DELTA = {     # small local sky-cover variation
+    "Connaught_Place": -0.03,
+    "Karol_Bagh": -0.02,
+    "Shahdara": 0.01,
+    "Rohini": 0.00,
+    "Dwarka": 0.02,
+    "Saket": 0.03,
+}
+ZONE_HEAT_SENSITIVITY = {  # how strongly AC load responds to heat above 30C
+    "Connaught_Place": 1.3,  # dense commercial AC load
+    "Karol_Bagh": 1.2,       # market density, older buildings
+    "Shahdara": 1.0,
+    "Rohini": 1.0,
+    "Dwarka": 0.9,           # newer, better-insulated stock
+    "Saket": 0.6,            # hospital hub: backup/critical-load HVAC, less heat-elastic
+}
+
 
 def hourly_load_multiplier(hour, is_festival):
     """Double daily peak shape: morning + evening, AC-driven summer evening spike."""
@@ -53,15 +87,21 @@ def generate(days=30, start_date="2025-10-01"):
 
         for hour in range(24):
             for zone in ZONES:
+                # hyperlocal weather: city-wide temp_c/cloud_cover perturbed by
+                # this zone's microclimate, so the model can learn that (e.g.)
+                # Connaught_Place runs hotter and more heat-elastic than Saket.
+                local_temp_c = temp_c + ZONE_TEMP_OFFSET_C[zone]
+                local_cloud_cover = float(np.clip(cloud_cover + ZONE_CLOUD_DELTA[zone], 0, 1))
+
                 load_mult = hourly_load_multiplier(hour, is_festival)
                 noise = np.random.normal(1.0, 0.06)
-                temp_effect = 1 + max(0, temp_c - 30) * 0.015  # AC load rises with heat
+                temp_effect = 1 + max(0, local_temp_c - 30) * 0.015 * ZONE_HEAT_SENSITIVITY[zone]
                 demand = ZONE_BASE_LOAD_MW[zone] * load_mult * temp_effect * noise
 
                 solar_gen = (
                     ZONE_SOLAR_CAPACITY_MW[zone]
                     * solar_multiplier(hour)
-                    * (1 - 0.7 * cloud_cover)
+                    * (1 - 0.7 * local_cloud_cover)
                 )
 
                 rows.append({
@@ -69,8 +109,8 @@ def generate(days=30, start_date="2025-10-01"):
                     "zone": zone,
                     "hour": hour,
                     "is_festival": int(is_festival),
-                    "temp_c": round(temp_c, 1),
-                    "cloud_cover": round(cloud_cover, 2),
+                    "temp_c": round(local_temp_c, 1),
+                    "cloud_cover": round(local_cloud_cover, 2),
                     "demand_mw": round(demand, 2),
                     "solar_gen_mw": round(solar_gen, 2),
                     "tx_capacity_mw": ZONE_TX_CAPACITY_MW[zone],
