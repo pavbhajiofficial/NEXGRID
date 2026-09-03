@@ -192,7 +192,7 @@ map_df = pd.DataFrame([
 left, right = st.columns([1.3, 1])
 with left:
     st.subheader("Zone allocation map")
-    fig_map = px.scatter_mapbox(
+    fig_map = px.scatter_map(
         map_df, lat="lat", lon="lon", size="demand_mw",
         color="shortfall_pct", color_continuous_scale="RdYlGn_r",
         hover_name="zone",
@@ -200,7 +200,10 @@ with left:
                     "lat": False, "lon": False},
         zoom=9.3, height=480, range_color=(0, 40),
     )
-    fig_map.update_layout(mapbox_style="open-street-map", margin=dict(l=0, r=0, t=0, b=0))
+    fig_map.update_layout(
+    map_style="open-street-map",
+    margin=dict(l=0, r=0, t=0, b=0)
+)
     st.plotly_chart(fig_map, use_container_width=True)
     st.caption("Red = zone is receiving noticeably less than it forecasted needing. Bubble size = demand.")
 
