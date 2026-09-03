@@ -1,4 +1,4 @@
-# AI-Based Electricity Demand & Peak-Demand Forecasting (Delhi)
+# NEXGRID - AI-Based Electricity Demand & Peak-Demand Forecasting (Delhi)
 **WINS-AID AI Hackathon 2026 — Problem 5, Innovator Track**
 
 ## Problem
