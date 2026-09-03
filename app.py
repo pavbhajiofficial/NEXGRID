@@ -345,18 +345,46 @@ else:
 
 # ---------------- Top metrics ----------------
 kpi_html = '<div class="kpi-row">'
-kpi_html += kpi_card("Total forecasted demand", f"{total_forecast:.0f} MW")
+
+# 1. Total forecasted demand
 kpi_html += kpi_card(
-    "Available grid supply", f"{total_grid_mw:.0f} MW",
-    delta=f"{total_grid_mw - total_forecast:.0f} MW", delta_positive=(total_grid_mw >= total_forecast)
+    "Total forecasted demand",
+    f"{total_forecast:.0f} MW"
 )
-kpi_html += kpi_card("Total served (grid + solar)", f"{result['total_served_mw']:.0f} MW")
+
+# 2. Available grid supply
+supply_delta = total_grid_mw - total_forecast
+kpi_html += kpi_card(
+    "Available grid supply",
+    f"{total_grid_mw:.0f} MW",
+    delta=f"{supply_delta:+.0f} MW",
+    delta_positive=(supply_delta >= 0)
+)
+
+# 3. Total served
+kpi_html += kpi_card(
+    "Total served (grid + solar)",
+    f"{result['total_served_mw']:.0f} MW"
+)
+
+# 4. Optimizer status
+optimizer_status = result["status"]
+if result["fairness_relaxed"]:
+    optimizer_status += " — relaxed"
+
 kpi_html += kpi_card(
     "Optimizer status",
-    result["status"] + (" — relaxed" if result["fairness_relaxed"] else "")
+    optimizer_status
 )
-kpi_html += kpi_card("CO₂ emissions this hour", f"{result['total_emissions_kg']/1000:.1f} t")
+
+# 5. CO₂ emissions
+kpi_html += kpi_card(
+    "CO₂ emissions this hour",
+    f"{result['total_emissions_kg'] / 1000:.1f} t"
+)
+
 kpi_html += '</div>'
+
 st.markdown(kpi_html, unsafe_allow_html=True)
 
 st.divider()
