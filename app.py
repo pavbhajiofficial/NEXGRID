@@ -199,7 +199,9 @@ with left:
     fig_map.update_layout(
     map_style="open-street-map",
     margin=dict(l=0, r=0, t=0, b=0)
-)@st.cache_resource
+)
+
+@st.cache_resource
 def load_model():
     fc = DemandForecaster()
 
