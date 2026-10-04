@@ -24,8 +24,7 @@ Historical load + weather + solar
 Live dashboard: map + charts + allocation table + shadow price (scarcity signal)
 ```
 
-## What's novel here (vs. existing commercial systems like AutoGrid/Uplight, already
-deployed on Tata Power Delhi Distribution)
+## What's novel here (vs. existing commercial systems like AutoGrid/Uplight, already deployed on Tata Power Delhi Distribution)
 1. **Uncertainty-aware forecasting** — P10/P90 bands feed directly into the optimizer,
    so allocation can be run for best-case, expected, or worst-case demand — not a
    single fragile point forecast.
@@ -62,7 +61,7 @@ src/optimize/allocator.py         LP allocation engine v1 (single-source, kept f
 src/optimize/market_allocator.py  LP allocation engine v2 -- bids + multi-source + green priority
                                    (this is what app.py actually uses)
 src/api/main.py         optional FastAPI wrapper (only needed for a separate React frontend)
-app.py                  Streamlit live demo — THIS IS WHAT YOU RUN FOR THE JUDGES
+app.py                  Streamlit live demo
 notebooks/              Colab-exported EDA / model training notebook
 docs/lit_review.md      papers + patents + gap analysis backing our novelty claims
 ```
@@ -124,16 +123,13 @@ python src/forecast/model.py             # trains + saves the forecaster
 streamlit run app.py                     
 ```
 
-## Known simplifications (be upfront about these to judges — it reads as maturity,
-not weakness)
+## Known simplifications
 - Transmission constraints are capacity limits, not a full AC/DC power-flow model.
 - No battery storage charge/discharge scheduling yet.
 - No ramp-rate or N-1 contingency check yet.
 - Synthetic data, not real DERC/BSES feeds (structure is ready to swap in real data).
 - Source capacities (Hydro/Gas/Coal split) are illustrative fixed fractions of
   total grid supply, not real-time generator dispatch data.
-
-These are explicitly listed as "Phase 2" in our pitch, not hidden.
 
 ## Team
 Bhavyasri Kurapati - 25BCE0298
